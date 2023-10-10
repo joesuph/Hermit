@@ -2,6 +2,10 @@
 #Pkg.add("SymbolicUtils")
 #using SymbolicUtils
 
+
+#TODO: Create global variable indexing so no conflicts are introduced.
+#TODO: Fix how free variables are counted
+
 #Formation rules
 function meet(a::Expr,b::Expr)
     Expr(:pair,a,b)
@@ -81,7 +85,6 @@ end
 prop(a,b,c,d,e) = prop(a,b,c,d,e,:default)
 
 function group(args...)
-    args |> println
     prop(:group,union(map(x->x.free_vars,args)...),union(map(x->x.universal_vars,args)...),[args...],max(map(x->x.max_index,args)...))
 end
 
@@ -104,13 +107,15 @@ function abstract(a::Symbol,b::prop)
 
     b = deepcopy(b)
     new_index = b.max_index+1
-    new_sym = Symbol("_x_$(new_index)")
 
     for arg_i in 1:length(b.args)
         abstract_recur(a,b.args[arg_i],new_index)
+
+        if b.args[arg_i].type == :symbol && string(b.args[arg_i].name)[1] == '_'
+            b.free_vars = union(b.free_vars,Set([b.args[arg_i].name]))
+        end
     end
 
-    b.free_vars = reduce(union,map(x->x.free_vars,b.args))
     b.max_index = reduce(max,map(x->x.max_index,b.args))
 
     b
@@ -130,9 +135,8 @@ function abstract_recur(a::Symbol,exp::prop,new_index::Int)
             abstract_recur(a,exp.args[arg_i],new_index)
             exp.max_index = max(exp.max_index,exp.args[arg_i].max_index)
 
-            println(string(exp.args[arg_i].name))
             if exp.args[arg_i].type == :symbol && string(exp.args[arg_i].name)[1] == '_'
-                exp.free_vars = union(exp.free_vars,exp.args[arg_i].name)
+                exp.free_vars = union(exp.free_vars,Set([exp.args[arg_i].name]))
             end
 
         end
@@ -147,30 +151,35 @@ function insert(a::Symbol,b::prop,c::prop)
     b = deepcopy(b)
 
     for arg_i in 1:length(b.args)
-        insert_recur(a,b.args[arg_i],c)
+        if b.args[arg_i].type == :symbol && b.args[arg_i].name == a
+            b.args[arg_i] = c
+        else
+            insert_recur(a,b.args[arg_i],c)
+        end
     end
 
-    b.free_vars = reduce(union,map(x->x.free_vars,b.args))
-    b.max_index = reduce(max,map(x->x.max_index,b.args))
+    b.free_vars = reduce(union,map(x->x.free_vars,b.args),init = Set())
+    b.max_index = reduce(max,map(x->x.max_index,b.args),init = 0)
 
     b
 end
 
-function insert_recur(a::Symbol,exp::prop,c::Symbol)
+function insert_recur(a::Symbol,exp::prop,c::prop)
+    println("H2")
+
     if exp.type == :entails
         return 
-    elseif exp.type == :symbol
-        if exp.name == a
-            exp.name = c
-            exp.max_index = 0
-        end
     else
-        for arg_i in 1:length[exp.args]
-            abstract_recur(a,exp.args[arg_i],new_index)
+        for arg_i in 1:length(exp.args)
+            if exp.args[arg_i].type == :symbol && exp.args[arg_i].name == a
+                exp.args[arg_i] = c
+            else
+                insert_recur(a,exp.args[arg_i],c)
+            end
         end
 
-        exp.free_vars = reduce(union,map(x->x.free_vars,exp.args))
-        exp.max_index = reduce(max,map(x->x.max_index,exp.args))
+        exp.free_vars = reduce(union,map(x->x.free_vars,exp.args), init = Set())
+        exp.max_index = reduce(max,map(x->x.max_index,exp.args),init = 0)
     end
 
 end
@@ -181,4 +190,4 @@ a |> repr |> println
 
 a.free_vars |> println
 
-insert(:_x_1,a,atom(:c)) |> repr |> println
+insert(:_x_1,a,group(atom(:c),atom(:d))) |> repr |> println
