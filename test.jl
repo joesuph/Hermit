@@ -1,6 +1,7 @@
-#TODO: Create global variable indexing so no conflicts are introduced.
 all_symbols = Set()
 symbol_index = 0
+nextIndex() = (global symbol_index += 1; symbol_index) 
+
 #TODO: Fix how free variables are counted
 #TODO: Add abstraction over any prop
 #TODO: Add abstraction over any arg_indices
@@ -45,7 +46,6 @@ mutable struct prop
     free_vars::Set{Symbol}
     universal_vars::Set{Symbol}
     args::Vector{prop}
-    max_index::Int
     name::Symbol
 end
 
@@ -84,36 +84,36 @@ function repr(a::prop)
     return string(a)
 end
 
-prop(a,b,c,d,e) = prop(a,b,c,d,e,:default)
+prop(a,b,c,d) = prop(a,b,c,d,:default)
 
 # Formation Rules
 
 function group(args...)
-    prop(:group,union(map(x->x.free_vars,args)...),union(map(x->x.universal_vars,args)...),[args...],max(map(x->x.max_index,args)...))
+    prop(:group,union(map(x->x.free_vars,args)...),union(map(x->x.universal_vars,args)...),[args...])
 end
 
 function atom(x::Symbol)
-    prop(:symbol,Set(),Set(),[],0,x)
+    prop(:symbol,Set(),Set(),[],x)
 end
 
 function prop(args::prop...)
-    prop(:prop,union(map(x->x.free_vars,args)...),union(map(x->x.universal_vars,args)...),args,max(map(x->x.max_index,args)...))
+    prop(:prop,union(map(x->x.free_vars,args)...),union(map(x->x.universal_vars,args)...),args)
 end
 
 function prop(args::Symbol...)
     args = map(atom,args)
-    prop(:prop,union(map(x->atomx.free_vars,args)...),union(map(x->x.universal_vars,args)...),args,max(map(x->x.max_index,args)...))
+    prop(:prop,union(map(x->atomx.free_vars,args)...),union(map(x->x.universal_vars,args)...),args)
 end
 
 
 function imp(a::prop,b::prop)
-    prop(:imp,union(a.free_vars,b.free_vars),union(a.universal_vars,b.universal_vars),[a,b],max(a.max_index,b.max_index))
+    prop(:imp,union(a.free_vars,b.free_vars),union(a.universal_vars,b.universal_vars),[a,b])
 end
 
 function imp(a::Symbol,b::Symbol)
     a = atom(a)
     b = atom(b)
-    prop(:imp,union(a.free_vars,b.free_vars),union(a.universal_vars,b.universal_vars),[a,b],max(a.max_index,b.max_index))
+    prop(:imp,union(a.free_vars,b.free_vars),union(a.universal_vars,b.universal_vars),[a,b])
 end
 
 function abstract(a::Symbol,b::prop)
@@ -122,7 +122,7 @@ function abstract(a::Symbol,b::prop)
     end
 
     b = deepcopy(b)
-    new_index = b.max_index+1
+    new_index = nextIndex()
 
     for arg_i in 1:length(b.args)
         abstract_recur(a,b.args[arg_i],new_index)
@@ -131,8 +131,6 @@ function abstract(a::Symbol,b::prop)
             b.free_vars = union(b.free_vars,Set([b.args[arg_i].name]))
         end
     end
-
-    b.max_index = reduce(max,map(x->x.max_index,b.args))
 
     b
 end
@@ -144,12 +142,10 @@ function abstract_recur(a::Symbol,exp::prop,new_index::Int)
     elseif exp.type == :symbol
         if exp.name == a
             exp.name = Symbol("_x_$(new_index)")
-            exp.max_index = new_index
         end
     else
         for arg_i in 1:length[exp.args]
             abstract_recur(a,exp.args[arg_i],new_index)
-            exp.max_index = max(exp.max_index,exp.args[arg_i].max_index)
 
             if exp.args[arg_i].type == :symbol && string(exp.args[arg_i].name)[1] == '_'
                 exp.free_vars = union(exp.free_vars,Set([exp.args[arg_i].name]))
@@ -175,7 +171,6 @@ function insert(a::Symbol,b::prop,c::prop)
     end
 
     b.free_vars = reduce(union,map(x->x.free_vars,b.args),init = Set())
-    b.max_index = reduce(max,map(x->x.max_index,b.args),init = 0)
 
     b
 end
@@ -193,7 +188,6 @@ function insert_recur(a::Symbol,exp::prop,c::prop)
         end
 
         exp.free_vars = reduce(union,map(x->x.free_vars,exp.args), init = Set())
-        exp.max_index = reduce(max,map(x->x.max_index,exp.args),init = 0)
     end
 
 end
@@ -204,13 +198,12 @@ function proj(a::prop,b::Int)
     a.args[b]
 end
 
-function introduce(a::prop, b::)
 
 
 #Entailment
 function mp(a::prop,b::prop)
     if b.type == :imp && matches(b.args[1],a)
-        return prop(:entails,a.free_vars,a.universal_vars, [group(a,b),b.args[1]],a.max_index)
+        return prop(:entails,a.free_vars,a.universal_vars, [group(a,b),b.args[1]])
     end
     return nothing
 end
@@ -223,11 +216,11 @@ end
 
 function e_tran(a::prop,b::prop)
     if a.type == :entails && b.type == :entails && matches(a.args[1],b.args[1])
-        return prop(:entails,union(a.free_vars,b.free_vars),union(a.universal_vars,b.universal_vars), [a.args[1],group(a.args[2],b.args[2])],a.max_index)
+        return prop(:entails,union(a.free_vars,b.free_vars),union(a.universal_vars,b.universal_vars), [a.args[1],group(a.args[2],b.args[2])])
     end
 
     if a.type == :entails && b.type == :entails && matches(a.args[2],b.args[1])
-        return prop(:entails,union(a.free_vars,b.free_vars),union(a.universal_vars,b.universal_vars),[a.args[1],b.args[2]],max(a.max_index,b.max_index))
+        return prop(:entails,union(a.free_vars,b.free_vars),union(a.universal_vars,b.universal_vars),[a.args[1],b.args[2]])
     end
     return nothing
 end
@@ -240,7 +233,7 @@ end
 
 function e_proj(a::prop,b::prop)
     if a.type == :group && in(b,a.args)
-        return prop(:entails,union(a.free_vars,b.free_vars),union(a.universal_vars,b.universal_vars),[a.args[1],b.args[2]],max(a.max_index,b.max_index))    
+        return prop(:entails,union(a.free_vars,b.free_vars),union(a.universal_vars,b.universal_vars),[a.args[1],b.args[2]])    
     end
     return nothing
 end
@@ -257,4 +250,3 @@ mp(g) |> repr |> println
 
 
 #Natural Numbers
-a = imp()
