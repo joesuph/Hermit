@@ -1,21 +1,12 @@
-#import Pkg; 
-#Pkg.add("SymbolicUtils")
-#using SymbolicUtils
-
-
 #TODO: Create global variable indexing so no conflicts are introduced.
+all_symbols = Set()
+symbol_index = 0
 #TODO: Fix how free variables are counted
-
-#Formation rules
-function meet(a::Expr,b::Expr)
-    Expr(:pair,a,b)
-end
-
-function proj(a::Expr,b::Int)
-    @assert a.head == :pair
-    @assert b == 1 || b == 2
-    a.args[b]
-end
+#TODO: Add abstraction over any prop
+#TODO: Add abstraction over any arg_indices
+#TODO handle free variables
+#TODO: handle universal_vars
+#TODO: Handle introduced variables
 
 function matches(a::Symbol,b::Symbol)
     if a == b
@@ -59,6 +50,22 @@ mutable struct prop
 end
 
 
+
+function matches(a::prop,b::prop)
+    if a.type == b.type && a.name == b.name
+        if length(a.args) == length(b.args)
+            for i in 1:length(a.args)
+                if !matches(a.args[i],b.args[i])
+                    return false
+                end
+            end
+            return true
+        end
+    end
+    return false
+end
+
+
 function repr(a::prop)
     if a.type == :symbol 
         return string(a.name)
@@ -77,12 +84,9 @@ function repr(a::prop)
     return string(a)
 end
 
-
-
-#meet(Expr(:a),Expr(:b)) |> println
-
-
 prop(a,b,c,d,e) = prop(a,b,c,d,e,:default)
+
+# Formation Rules
 
 function group(args...)
     prop(:group,union(map(x->x.free_vars,args)...),union(map(x->x.universal_vars,args)...),[args...],max(map(x->x.max_index,args)...))
@@ -96,7 +100,19 @@ function prop(args::prop...)
     prop(:prop,union(map(x->x.free_vars,args)...),union(map(x->x.universal_vars,args)...),args,max(map(x->x.max_index,args)...))
 end
 
+function prop(args::Symbol...)
+    args = map(atom,args)
+    prop(:prop,union(map(x->atomx.free_vars,args)...),union(map(x->x.universal_vars,args)...),args,max(map(x->x.max_index,args)...))
+end
+
+
 function imp(a::prop,b::prop)
+    prop(:imp,union(a.free_vars,b.free_vars),union(a.universal_vars,b.universal_vars),[a,b],max(a.max_index,b.max_index))
+end
+
+function imp(a::Symbol,b::Symbol)
+    a = atom(a)
+    b = atom(b)
     prop(:imp,union(a.free_vars,b.free_vars),union(a.universal_vars,b.universal_vars),[a,b],max(a.max_index,b.max_index))
 end
 
@@ -165,8 +181,6 @@ function insert(a::Symbol,b::prop,c::prop)
 end
 
 function insert_recur(a::Symbol,exp::prop,c::prop)
-    println("H2")
-
     if exp.type == :entails
         return 
     else
@@ -184,10 +198,63 @@ function insert_recur(a::Symbol,exp::prop,c::prop)
 
 end
 
+function proj(a::prop,b::Int)
+    @assert a.type == :group
+    @assert b <= length(a.args)
+    a.args[b]
+end
+
+function introduce(a::prop, b::)
+
+
+#Entailment
+function mp(a::prop,b::prop)
+    if b.type == :imp && matches(b.args[1],a)
+        return prop(:entails,a.free_vars,a.universal_vars, [group(a,b),b.args[1]],a.max_index)
+    end
+    return nothing
+end
+
+function mp(a::prop)
+    if a.type == :group && length(a.args) ==2
+        return mp(a.args[1],a.args[2])
+    end
+end
+
+function e_tran(a::prop,b::prop)
+    if a.type == :entails && b.type == :entails && matches(a.args[1],b.args[1])
+        return prop(:entails,union(a.free_vars,b.free_vars),union(a.universal_vars,b.universal_vars), [a.args[1],group(a.args[2],b.args[2])],a.max_index)
+    end
+
+    if a.type == :entails && b.type == :entails && matches(a.args[2],b.args[1])
+        return prop(:entails,union(a.free_vars,b.free_vars),union(a.universal_vars,b.universal_vars),[a.args[1],b.args[2]],max(a.max_index,b.max_index))
+    end
+    return nothing
+end
+
+function e_tran(a::prop)
+    if a.type == :group && length(a.args) ==2
+        return e_tran(a.args[1],a.args[2])
+    end
+end
+
+function e_proj(a::prop,b::prop)
+    if a.type == :group && in(b,a.args)
+        return prop(:entails,union(a.free_vars,b.free_vars),union(a.universal_vars,b.universal_vars),[a.args[1],b.args[2]],max(a.max_index,b.max_index))    
+    end
+    return nothing
+end
 a = abstract(:a,group(atom(:a),atom(:b),atom(:a)))
 
 a |> repr |> println
 
-a.free_vars |> println
+a = imp(:a,:b)
+b = atom(:a)
 
-insert(:_x_1,a,group(atom(:c),atom(:d))) |> repr |> println
+g = group(b,a)
+
+mp(g) |> repr |> println
+
+
+#Natural Numbers
+a = imp()
