@@ -259,6 +259,24 @@ function proj(a::Prop,b::Int)
     return a.args[b]
 end
 
+function introSymFromProp(symb::Symbol,p::Prop, start = true, og=nothing)
+    if start 
+        p = deepcopy(p) 
+    end
+
+    if p.type == :symbol && ((og === nothing && string(p.name)[end]== '_')|| p.name == og)
+        og = p.name
+        p.name = symb
+    end
+
+    for arg_i in 1:length(p.args)
+        p.args[arg_i],og = introSymFromProp(symb,p.args[arg_i],false,og)
+    end
+
+    start ? p : (p,og) 
+end
+
+
 function introduce(a::Symbol,b::Prop,c::Prop)
     @assert string(a)[end] == '_' 
     @assert c.type == :symbol 
@@ -372,8 +390,9 @@ nextNum = imp(Prop(:_x, isNum),group(Prop(:y_, isNum),Prop(:_x, :lt, :y_)))
 
 
 #Scratch
+mp(zeroIsNum,nextNum)|> repr |> println
 
-mp(zeroIsNum,nextNum) |> repr |> println
+introSymFromProp(:one,mp(zeroIsNum,nextNum)) |> repr |> println
 
 #introduce(:y_,res,:one) |> repr |> println
 
