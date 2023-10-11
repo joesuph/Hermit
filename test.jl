@@ -10,36 +10,7 @@ nextIndex() = (global symbol_index += 1; symbol_index)
 #TODO: handle universal_vars
 #TODO: Handle introduced variables
 
-function matches(a::Symbol,b::Symbol)
-    if a == b
-        return true
-    end
-    if b == :_
-        return true
-    end
-    return false
-end
 
-function matches(a::Expr,b::Symbol)
-    if b == :_
-        return true
-    end
-    return false
-end
-
-function matches(a::Expr,b::Expr)
-    if a.head == b.head
-        if length(a.args) == length(b.args)
-            for i in 1:length(a.args)
-                if !matches(a.args[i],b.args[i])
-                    return false
-                end
-            end
-            return true
-        end
-    end
-    return false
-end
 
 
 mutable struct Prop
@@ -49,6 +20,43 @@ mutable struct Prop
     args::Vector{Prop}
     name::Symbol
 end
+
+function matchTest(a::Prop,b::Prop,info=[])
+    info_dict = Dict()
+    map(x->info_dict[x] =Dict(),info)
+
+    if b.type == :symbol && string(b.name)[1] == '_'
+        if in("fills", info) 
+            if !haskey(info_dict["fills"],b.name) 
+                info_dict["fills"][b.name] = a.name
+            elseif info_dict["fills"][b.name] != a.name
+                return (false,info_dict)
+            end
+        end
+        return (true,info_dict)
+
+    elseif a.type == :symbol && b.type == :symbol
+        return (a.name == b.name,info_dict)
+    
+    elseif a.type == b.type && length(a.args) == length(b.args)
+        for i in 1:length(a.args)
+            match_results = matchTest(a.args[i],b.args[i],info)
+            info_dict["fills"] = merge(info_dict["fills"],match_results[2]["fills"])
+            if !match_results[1]
+                return info_dict != Dict() ? (false,info_dict) : false
+            end
+        end
+
+        if info_dict != Dict()
+            return (true,info_dict)
+        end
+
+        return true
+    end
+
+    return false
+end
+
 
 #=
 function match_tran(a::Prop,b::Prop)
@@ -60,7 +68,7 @@ function match_tran(a::Prop,b::Prop)
 end
 =#
 function create_match(a::Prop,b::Prop)
-    if a.type == :matches && b.type == :inserts
+    if a.type == :matches && b.type == :plugin
         if a.args[2] == b.args[4]
             return Prop(:matches,union(a.args[1].free_var,b.args[2].free_var),union(a.args[1].universal_vars,b.args[2].universal_vars),[a.args[1],b.args[2]])
         end
@@ -99,13 +107,13 @@ function repr(a::Prop)
         return "∀$(repr(a.args[1])):$(repr(a.args[2])),$(repr(a.args[3]))"
     elseif a.type == :entails
         return "$(repr(a.args[1])) ⊢ $(repr(a.args[2]))"
-    elseif a.type == :inserts
-        return "[$(repr(a.args[1]))/$(repr(a.args[3]))]$(repr(a.args[2])) = $(repr(a.args[4]))"
+    elseif a.type == :plugin
+        return "$(repr(a.args[2]))[$(repr(a.args[1])) := $(repr(a.args[3]))] = $(repr(a.args[4]))"
     elseif a.type == :matches
         return "$(repr(a.args[1])) -> $(repr(a.args[2]))"
     end
 
-    return string(a)
+    return error("Type of Prop not recognized")
 end
 
 Prop(a,b,c,d) = Prop(a,b,c,d,:default)
@@ -197,10 +205,22 @@ function abstract_recur(a::Symbol,exp::Prop,new_index::Int)
     end
 end
 
-function insert(a::Symbol,b::Prop,c::Prop)
-    if !in(a,b.free_vars)
-        return nothing
+
+
+function plug_in(a::Prop,b::Prop)
+    if length(b.free_vars) > 0
+        return insert(collect(b.free_vars)[1],b,a)
     end
+    return nothing
+end
+
+function plug_in_at(a::Prop,b::Prop,c::Symbol)
+    return insert(c,b,a)
+end
+
+function insert(a::Symbol,b::Prop,c::Prop)
+    @assert in(a,b.free_vars)
+
     og = b
     b = deepcopy(b)
 
@@ -214,7 +234,7 @@ function insert(a::Symbol,b::Prop,c::Prop)
 
     b.free_vars = reduce(union,map(x->x.free_vars,b.args),init = Set())
 
-    group(b,Prop(:inserts,Set(),Set(),[c,og,atom(a),b]))
+    group(b,Prop(:plugin,Set(),Set(),[c,og,atom(a),b]))
 end
 
 function insert_recur(a::Symbol,exp::Prop,c::Prop)
@@ -240,9 +260,10 @@ function proj(a::Prop,b::Int)
 end
 
 function introduce(a::Symbol,b::Prop,c::Prop)
-    if string(a)[end] != '_' || c.type != :symbol ||  in(c.name,all_symbols) || length(b.free_vars)>0 
-        return nothing
-    end
+    @assert string(a)[end] == '_' 
+    @assert c.type == :symbol 
+    @assert !in(c.name,all_symbols) 
+
     b = deepcopy(b)
 
     for arg_i in 1:length(b.args)
@@ -280,24 +301,39 @@ introduce(a::Symbol,b::Prop,c::Symbol) = introduce(a,b,atom(c,false))
 
 
 #Entailment
-function mp(ant::Prop,implication::Prop)
-    #check if they already match
-    ant_match_with_implication = create_match(ant,implication.args[1])
-    if ant_match_with_implication !== nothing
-        return Prop(:entails,union(ant_match_with_implication[2].free_vars,implication.args[2].free_vars),union(ant_match_with_implication[2].universal_vars,implication.args[2].universal_vars),[group(ant,implication),implication.args[2]])
-    end
-    
-    #check if they match after inserting
-    if length(implication.free_vars) != 1 return nothing end
-    ant_insert_into_implication = insert(collect(implication.free_vars)[1],implication,ant).args[1]
-    return Prop(:entails, ant_insert_into_implication.args[2].free_vars,Set(),[group(ant,implication), ant_insert_into_implication.args[2]])
+function mp(antecedent::Prop, implication::Prop)
+    match_test_results = matchTest(antecedent,implication.args[1],["fills"])
 
+    if match_test_results[1]
+        new_consequent = replacePropFromDict(implication.args[2],match_test_results[2]["fills"])
+        return Prop(:entails,union(antecedent.free_vars,new_consequent.free_vars),union(antecedent.universal_vars,new_consequent.universal_vars),[group(antecedent,implication),new_consequent])    
+    end
+end
+
+function replacePropFromDict(a::Prop,dict::Dict, start = true)
+    if start
+        a = deepcopy(a)
+    end
+
+    if a.type == :symbol
+        if haskey(dict,a.name)
+            a.name = dict[a.name]
+
+        end
+    end
+
+    for arg_i in 1:length(a.args)
+        a.args[arg_i] = replacePropFromDict(a.args[arg_i],dict,false)
+    end
+
+    a
 end
 
 function mp(a::Prop)
-    if a.type == :group && length(a.args) ==2
-        return mp(a.args[1],a.args[2])
-    end
+    @assert a.type == :group 
+    @assert length(a.args) ==2
+    return mp(a.args[1],a.args[2])
+
 end
 
 #=
@@ -334,11 +370,10 @@ context = group(zero,isNum,zeroIsNum)
 
 nextNum = imp(Prop(:_x, isNum),group(Prop(:y_, isNum),Prop(:_x, :lt, :y_)))
 
-insert(:_x,nextNum,zero) |> repr |> println
 
 #Scratch
 
-res = mp(zeroIsNum,nextNum) 
+mp(zeroIsNum,nextNum) |> repr |> println
 
-introduce(:y_,res,:one) |> repr |> println
+#introduce(:y_,res,:one) |> repr |> println
 
