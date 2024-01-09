@@ -1,0 +1,9 @@
+a := sam + 3
+
+A x := (x IsEven), (x > 2)
+
+A definition means it may not occur as a term in a phrase.
+
+
+
+
