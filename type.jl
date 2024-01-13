@@ -14,6 +14,24 @@ function parse(code::String)::Vector{String}
     return code 
 end
 
+function check_outer_square_brackets(code::Vector{String})::Bool
+    if code[1] == "[" && code[end] == "]"
+        paren_count = 0
+        for i in 1:length(code)
+            if code[i] == "["
+                paren_count += 1
+            elseif code[i] == "]"
+                paren_count -= 1
+                if paren_count == 0 && i != length(code)
+                    return false
+                end
+            end
+        end
+        return true
+    end
+    return false
+end
+
 #If symbol list is surronded by parentheses, remove them
 function remove_outer_parentheses(code::Vector{String})::Vector{String}
     if code[1] == "(" && code[end] == ")"
@@ -43,13 +61,13 @@ function add_outer_parentheses(code::Vector{String})::Vector{String}
             elseif code[i] == ")"
                 paren_count -= 1
                 if paren_count == 0 && i != length(code)
-                    return ["("...,code...,")"...]
+                    return ["(",code...,")"]
                 end
             end
         end
         return code
     end
-    return ["("...,code...,")"...]
+    return ["(",code...,")"]
 end
 
 #Group up text in parentheses
@@ -88,8 +106,13 @@ function checkMatches(code1::Vector{String},pattern::Vector{String}, get_vars = 
     matches = Dict()
 
     #remove outer parenthesis
-    code1 = remove_outer_parentheses(code1)
     pattern = remove_outer_parentheses(pattern)
+    pattern_is_just_disjunction = check_outer_square_brackets(pattern)
+    if pattern_is_just_disjunction
+        code1 = add_outer_parentheses(code1)
+    else
+        code1 = remove_outer_parentheses(code1)
+    end
 
     println(code1)
     println(pattern)
@@ -137,9 +160,7 @@ function checkMatches(code1::Vector{String},pattern::Vector{String}, get_vars = 
                 end
             end
         #Handle disjunctions
-        elseif code1[example_index] == "(" && pattern[pattern_index] == "["
-            
-
+        elseif (code1[example_index] == "("  && pattern[pattern_index] == "[" )
             #Get the argument of the disjunction
             arg = ""
             paren_count = 1
@@ -278,8 +299,11 @@ code=  "(Sam tam)"
 
 code2 = parse(code)
 
-println(checkMatches(parse("( b is Num )"),parse("[_x is Num|_x > 2] "),true))
+println(checkMatches(parse("b > 2"),parse("[_x is Num|_x > 2]"),true))
 
+#Do I need to remove outer parentheses?
+#how does it make it helpful? 
+#Maybe if I ensure outer parenthesis, then I add skip if we do
 
 # Read string from file
 #filename = "script.hm"
