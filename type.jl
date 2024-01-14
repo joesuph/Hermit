@@ -1,7 +1,5 @@
 #main file
 
-
-
 #Convert code to symbol list including parentheses and bars
 function parse(code::String)::Vector{String}
     code = replace(code,"("=>" ( ")
@@ -9,6 +7,7 @@ function parse(code::String)::Vector{String}
     code = replace(code, "|" => " | ")
     code = replace(code,"["=>" [ ")
     code = replace(code,"]"=>" ] ")
+    code = replace(code,","=>" , ")
     code = replace(code,r"\s+"=>" ")
     code = filter( (x) -> x != "", split(code," "))
     return code 
@@ -101,9 +100,12 @@ function ungroup_parentheses(code::Vector{String})::Vector{String}
     return code
 end
 
+#What do I need to add to handle commas?
+#If commas occur not in a group then split on them and check that 
 
-function checkMatches(code1::Vector{String},pattern::Vector{String}, get_vars = false)
-    matches = Dict()
+
+function checkMatches(code1::Vector{String},pattern::Vector{String}, get_vars = false)::Union{Bool, Tuple{Bool,Dict{String,String}}}
+    matches = Dict{String,String}()
 
     #remove outer parenthesis
     pattern = remove_outer_parentheses(pattern)
@@ -113,9 +115,6 @@ function checkMatches(code1::Vector{String},pattern::Vector{String}, get_vars = 
     else
         code1 = remove_outer_parentheses(code1)
     end
-
-    println(code1)
-    println(pattern)
 
     example_index = 1
     pattern_index = 1
@@ -134,7 +133,7 @@ function checkMatches(code1::Vector{String},pattern::Vector{String}, get_vars = 
         end
 
         #if the string is (, skip to the the closing )
-        if code1[example_index] == "(" && pattern[pattern_index] == "_"
+        if code1[example_index] == "(" && pattern[pattern_index][1] == '_'
             paren_count = 1
             #Find the closing )
             for i in example_index+1:length(code1)
@@ -153,7 +152,7 @@ function checkMatches(code1::Vector{String},pattern::Vector{String}, get_vars = 
                         else #If matches doesn't have a value then add it
                             matches[pattern[pattern_index]] = join(code1[example_index:i], ' ')
                         end
-
+                        
                         example_index = i
                         break
                     end
@@ -216,31 +215,6 @@ function checkMatches(code1::Vector{String},pattern::Vector{String}, get_vars = 
                 end
 
             end
-            #=Old section
-
-            option_list = split(pattern[pattern_index],'|')[2:end-1]
-            for i in 1:length(option_list)
-                if code1[i] == "("
-                    paren_count += 1
-                elseif code1[i] == ")"
-                    paren_count -= 1
-                    if paren_count == 0
-                        
-                        if haskey(matches,pattern[pattern_index])
-                            if matches[pattern[pattern_index]] != join(code1[example_index:i], ' ')
-                                return get_vars ? (false,matches) : false
-                            end
-                        else
-                            matches[pattern[pattern_index]] = join(code1[example_index:i], ' ')
-                        end
-
-                        example_index = i
-                        break
-                    end
-                end
-            end
-            =#
-        #Handle Lambdas
 
         #If pattern is a wildcard check if matches has a value for it or add it
         else
@@ -293,25 +267,26 @@ function modus_ponens(code::Vector{String}, implication_pattern::Vector{String})
     return conclusion
 end
 
+function proj(code::Vector{String}, index::Int)::Vector{String}
+    return ungroup_parentheses(split_list_on_commas(code)[index])
+end
 
-code = "_a -> (_b -> (_a -> _a = _b)), (Sam tam)"
-code=  "(Sam tam)"
+function split_list_on_commas(code::Vector{String})::Vector{Vector{String}}
+    separated_lists = []
+    j = 1
+    for i in 1:length(code)
+        if code[i] == ","
+            push!(separated_lists,code[j:i-1])
+            j = i+1
+        end
+    end
+    push!(separated_lists,code[j:end])
+    return separated_lists
+end
 
-code2 = parse(code)
+#include("test.jl")
 
-println(checkMatches(parse("b > 2"),parse("[_x is Num|_x > 2]"),true))
 
-#Do I need to remove outer parentheses?
-#how does it make it helpful? 
-#Maybe if I ensure outer parenthesis, then I add skip if we do
-
-# Read string from file
-#filename = "script.hm"
-#fcode = read(filename, String)
-
-#fcode = split(fcode,"\n")
-
-#code2 = group_parentheses(file_contents)
 
 
 #=
