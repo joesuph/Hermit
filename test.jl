@@ -1,6 +1,6 @@
 using Test
 
-@testset "MyTestSet" begin
+@testset "Base" begin
     @test parse("a b c") == ["a","b","c"]
     @test parse("a (b c)") == ["a","(","b","c",")"]
     @test checkMatches(parse("a b c"),parse("a b c")) == true
@@ -20,5 +20,10 @@ using Test
 
         one = proj(modus_ponens(nat[1],ungroup_parentheses(nat[2])),1)
         join(proj(modus_ponens(one,ungroup_parentheses(nat[2])),1)," ") == "( succ ( succ 0 ) ) is Num"
+    end
+    @test begin 
+        a = "one is Num"
+        b = "_a is Num -> (succ _a) is Num"
+        modus_ponens(parse(a),parse(b)) == parse("(succ one) is Num")
     end
 end

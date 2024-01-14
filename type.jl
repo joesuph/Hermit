@@ -121,7 +121,7 @@ function checkMatches(code1::Vector{String},pattern::Vector{String}, get_vars = 
     #Compare each term one by one
     while pattern_index <= length(pattern)
         #Compare code term and pattern term
-        println(code1[example_index], " ", pattern[pattern_index])
+
         #if they don't match or have a speccial case return false
         if example_index > length(code1) || #pattern is longer than code
                 (code1[example_index] != pattern[pattern_index] && #code doesn't match pattern
@@ -179,8 +179,9 @@ function checkMatches(code1::Vector{String},pattern::Vector{String}, get_vars = 
             end
             
             
-            println("arg: ",arg)
-            @assert arg != "" #if empty argument wasn't read correctly
+            if arg == ""
+                throw(ErrorException("Error: Disjunction argument not found either because no closing ']' was found or because the argument was empty"))
+            end
 
             #Find the closing ]
             paren_count = 1
@@ -251,7 +252,16 @@ end
 
 function modus_ponens(code::Vector{String}, implication_pattern::Vector{String})::Vector{String}
     grouped_implication = group_parentheses(parse(join(implication_pattern, " ")))
-    println(grouped_implication)
+    println("grouped implication: ",grouped_implication)
+    if "->" in grouped_implication && grouped_implication[2] != "->"
+        println("got here")
+        premise = grouped_implication[1:findfirst(isequal("->"),grouped_implication)-1]
+        conclusion = grouped_implication[findfirst(isequal("->"),grouped_implication)+1:end]
+        grouped_implication = [add_outer_parentheses(premise)..., "->", add_outer_parentheses(conclusion)...]
+        grouped_implication = group_parentheses(grouped_implication)
+        println("new grouped_implication:", grouped_implication)
+    end
+
     @assert grouped_implication[2] == "->"
 
     premise = parse(grouped_implication[1])
@@ -284,7 +294,9 @@ function split_list_on_commas(code::Vector{String})::Vector{Vector{String}}
     return separated_lists
 end
 
-#include("test.jl")
+
+
+include("test.jl")
 
 
 
