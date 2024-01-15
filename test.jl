@@ -26,4 +26,11 @@ using Test
         b = "_a is Num -> (succ _a) is Num"
         modus_ponens(parse(a),parse(b)) == parse("(succ one) is Num")
     end
+    @test begin
+        definitions = Dict{String,String}()
+        definitions = merge(definitions,assignment_to_match(parse("a _d := b c _d")))
+        replace_definitions(parse("a sam"),definitions) == ["b","c","sam"]
+    end
+    @test split_list_on_commas(parse("a b, cam")) == [["a","b"],["cam"]]
 end
+

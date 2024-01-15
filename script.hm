@@ -1,9 +1,11 @@
 a := sam + 3
 
+A _x := _x + 1
+#Gather entailments for a certain context
+
+
+
 A x := (x IsEven), (x > 2)
-
-A definition means it may not occur as a term in a phrase.
-
 
 
 

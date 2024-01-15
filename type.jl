@@ -8,10 +8,13 @@ function parse(code::String)::Vector{String}
     code = replace(code,"["=>" [ ")
     code = replace(code,"]"=>" ] ")
     code = replace(code,","=>" , ")
+    code = replace(code,":="=>" := ")
     code = replace(code,r"\s+"=>" ")
     code = filter( (x) -> x != "", split(code," "))
     return code 
 end
+
+
 
 function check_outer_square_brackets(code::Vector{String})::Bool
     if code[1] == "[" && code[end] == "]"
@@ -172,7 +175,6 @@ function checkMatches(code1::Vector{String},pattern::Vector{String}, get_vars = 
                     if paren_count == 0
                         arg = parse(join(code1[example_index:i], ' '))
                         example_index = i
-                        println("new_index: ",example_index)
                         break
                     end
                 end
@@ -252,14 +254,11 @@ end
 
 function modus_ponens(code::Vector{String}, implication_pattern::Vector{String})::Vector{String}
     grouped_implication = group_parentheses(parse(join(implication_pattern, " ")))
-    println("grouped implication: ",grouped_implication)
     if "->" in grouped_implication && grouped_implication[2] != "->"
-        println("got here")
         premise = grouped_implication[1:findfirst(isequal("->"),grouped_implication)-1]
         conclusion = grouped_implication[findfirst(isequal("->"),grouped_implication)+1:end]
         grouped_implication = [add_outer_parentheses(premise)..., "->", add_outer_parentheses(conclusion)...]
         grouped_implication = group_parentheses(grouped_implication)
-        println("new grouped_implication:", grouped_implication)
     end
 
     @assert grouped_implication[2] == "->"
@@ -294,10 +293,72 @@ function split_list_on_commas(code::Vector{String})::Vector{Vector{String}}
     return separated_lists
 end
 
+function assignment_to_match(code::Vector{String})::Dict{String,String}
+    match = Dict{String,String}()
+    
+    code = group_parentheses(code)
+    if ":=" in code
+        assignment_index = findfirst(isequal(":="),code)
+        variable = join(code[1:assignment_index-1]," ")
+        value = code[assignment_index+1:end]
+        match[variable] = join(value," ")
+    end
+    return match
+end
+
+#Add recursion over subexpressions and over commas
+function replace_definitions(code::Vector{String}, definitions::Dict{String,String})::Vector{String}
+    
+    #handle commas
+    grouped_code = group_parentheses(code)
+    codes = split_list_on_commas(grouped_code)
+    if length(codes) > 1
+        result = []
+        for c in codes
+            result = [result...,replace_definitions(ungroup_parentheses(c),definitions)...,","]
+        end
+        return result[1:end-1]
+    end
+    
+
+    #check entire code between comma
+    for key in keys(definitions)
+        match_result = checkMatches(code,parse(key),true)
+        if match_result[1]
+            return replace_vars(parse(definitions[key]),match_result[2])
+        end
+    end
+    
+    #check subexpressions
 
 
-include("test.jl")
+    return code
+end
 
+
+
+#include("test.jl")
+
+# Open the file
+file = open("script.hm", "r")
+
+# Read the contents of the file
+contents = read(file, String)
+
+# Close the file
+close(file)
+
+# Print the contents of the file
+lines = split(contents,"\n")
+definitions = Dict{String,String}()
+
+#Remove comments and empty lines
+lines = [strip(line) for line in lines if strip(line) != "" && strip(line)[1] != '#']
+
+
+
+definitions = Dict{String,String}("_x is Num" =>"_x has size")
+println(replace_definitions(parse("a b c, (a is Num), q r s"),definitions))
 
 
 
@@ -321,7 +382,6 @@ HTTP.listen() do http::HTTP.Stream
 end
 println("done")
 =#
-
 
 
 
