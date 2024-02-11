@@ -1,6 +1,8 @@
-a := sam + 3
+dad := sam + 3
 
-A _x := a, _x
+A _x := dad + 2
+
+B cat := A 4
 #Gather entailments for a certain context
 
 
