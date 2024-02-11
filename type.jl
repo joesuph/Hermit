@@ -108,7 +108,7 @@ end
 
 
 function checkMatches(code1::Vector{String},pattern::Vector{String}, get_vars = false)::Union{Bool, Tuple{Bool,Dict{String,String}}}
-    println("checking: ",code1," == ",pattern)
+    #println("checking: ",code1," == ",pattern)
     
     matches = Dict{String,String}()
 
@@ -135,8 +135,8 @@ function checkMatches(code1::Vector{String},pattern::Vector{String}, get_vars = 
 
             return get_vars ? (false,matches) : false
         end
-        println("code1[example_index]: ",code1[example_index])
-        println("pattern[pattern_index]: ",pattern[pattern_index])
+        #println("code1[example_index]: ",code1[example_index])
+        #println("pattern[pattern_index]: ",pattern[pattern_index])
 
         #if the string is (, skip to the the closing )
         if code1[example_index] == "(" && pattern[pattern_index][1] == '_'
@@ -315,6 +315,8 @@ function assignment_to_match(code::Vector{String})::Dict{String,String}
     return match
 end
 
+
+
 #Add recursion over subexpressions and over commas
 function replace_definitions(code::Vector{String}, definitions::Dict{String,String})::Vector{String}
     code = remove_outer_parentheses(code)
@@ -336,7 +338,6 @@ function replace_definitions(code::Vector{String}, definitions::Dict{String,Stri
     end
     
     #handle individual groups, if reaches here only one group
-
     #check for match entire group with definition
     for key in keys(definitions)
         match_result = checkMatches(code,parse(key),true)
@@ -352,7 +353,7 @@ function replace_definitions(code::Vector{String}, definitions::Dict{String,Stri
             match_result = checkMatches(ungroup_parentheses([grouped_code[term_index]]),parse(key),true)
             if match_result[1]
                 rv = add_outer_parentheses(replace_vars(parse(definitions[key]),match_result[2]))
-                grouped_code = [grouped_code[1:term_index-1]...,rv...,grouped_code[term_index+1:end]...  ]
+                grouped_code = [grouped_code[1:term_index-1]...,group_parentheses(rv)...,grouped_code[term_index+1:end]...  ]
             elseif grouped_code[term_index][1] == '('  #handle term by term within group
                 rv = replace_definitions(ungroup_parentheses([grouped_code[term_index]]),definitions)
                 grouped_code = [grouped_code[1:term_index-1]...,group_parentheses(add_outer_parentheses(rv))...,grouped_code[term_index+1:end]...  ]
@@ -377,7 +378,6 @@ function replace_definitions(code::Vector{String}, definitions::Dict{String,Stri
     =#
     code = ungroup_parentheses(grouped_code)
 
-    println("final code: ",code)
     #Add order so definitions may contain terms from other definitions
     return code
 end
@@ -400,27 +400,32 @@ function run(file_name::String)
     #Remove comments and empty lines
     lines = [strip(line) for line in lines if strip(line) != "" && strip(line)[1] != '#']
 
-    for line in lines
+
+    for line_index in eachindex(lines)
+        line = lines[line_index]
         line = replace_definitions(parse(line),definitions)
         definitions = merge(definitions,assignment_to_match(line))
-        println(join(line,' '))
+        lines[line_index] = join(line,' ')
     end
+
+    println("\n\n")
+    for line in lines
+        println(line)
+    end
+    println("\n\n")
     println(definitions)
 end
 
 #include("test.jl")
-
 
 run("script.hm")
 
 #definitions = Dict{String,String}("a"=>"b c d")
 #println("replace: ",replace_definitions(parse("c _x := a"),definitions))
 
-#
 
 #definitions = Dict{String,String}("_x is Num" =>"_x has size")
 #println(replace_definitions(parse("a b c, (a is Num), q r s"),definitions))
-
 
 
 #=

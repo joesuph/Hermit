@@ -1,8 +1,22 @@
 dad := sam + 3
 
-A _x := dad + 2
+A _x := dad + _x
 
-B cat := A 4
+#this works
+D lamb := (A 4) + 3
+
+# Also works
+B cat := A 4 + 3
+
+#stored as expected
+bad_rule := _a is bad -> don't elect _a
+fact := john is bad
+
+
+#bad example
+oth := bad_rule(fact)
+
+
 #Gather entailments for a certain context
 
 
