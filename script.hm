@@ -16,6 +16,8 @@ fact := john is bad
 #bad example
 oth := bad_rule(fact)
 
+bad_rule(fact)
+
 
 #Gather entailments for a certain context
 

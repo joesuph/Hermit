@@ -361,27 +361,19 @@ function replace_definitions(code::Vector{String}, definitions::Dict{String,Stri
         end
     end
 
-    #=
-    grouped_code = group_parentheses(code)
-    for term_index in reverse(1:length(grouped_code))
-        for key in keys(definitions)
-            match_result = checkMatches(ungroup_parentheses([grouped_code[term_index]]),parse(key),true)
-            if match_result[1]
-                println("match_result: ", match_result[2])
-                rv = add_outer_parentheses(replace_vars(parse(definitions[key]),match_result[2]))
-                println("rv: ",rv)
-                println("grouped_code: ",grouped_code)
-                grouped_code = [grouped_code[1:term_index-1]...,rv...,grouped_code[term_index+1:end]...  ] 
-            end
-        end
-    end
-    =#
     code = ungroup_parentheses(grouped_code)
 
     #Add order so definitions may contain terms from other definitions
     return code
 end
 
+function evaluate(code::Vector{String})
+
+    grouped_code = group_parentheses(remove_outer_parentheses(code))
+    if length(grouped_code) == 2 &&  occursin("->",grouped_code[1])
+        println(modus_ponens(remove_outer_parentheses(ungroup_parentheses([grouped_code[2]])),remove_outer_parentheses(ungroup_parentheses([grouped_code[1]]))))
+    end
+end
 
 function run(file_name::String)
     # Open the file
@@ -400,20 +392,20 @@ function run(file_name::String)
     #Remove comments and empty lines
     lines = [strip(line) for line in lines if strip(line) != "" && strip(line)[1] != '#']
 
-
     for line_index in eachindex(lines)
         line = lines[line_index]
         line = replace_definitions(parse(line),definitions)
         definitions = merge(definitions,assignment_to_match(line))
+        evaluate(line)
         lines[line_index] = join(line,' ')
     end
 
-    println("\n\n")
-    for line in lines
-        println(line)
-    end
-    println("\n\n")
-    println(definitions)
+    #println("\n\n")
+    #for line in lines
+    #    println(line) 
+    #end
+    #println("\n\n")
+    #println(definitions)
 end
 
 #include("test.jl")
