@@ -32,5 +32,6 @@ using Test
         replace_definitions(parse("a sam"),definitions) == ["b","c","sam"]
     end
     @test split_list_on_commas(parse("a b, cam")) == [["a","b"],["cam"]]
+    @test replace_definitions(parse("a b c, (a is Num), q r s"),Dict{String,String}("_x is Num" =>"_x has size")) == ["a", "b", "c", ",", "a", "has", "size", ",", "q", "r", "s"]
 end
 

@@ -1,7 +1,7 @@
 #main file
 
 #Convert code to symbol list including parentheses and bars
-function parse(code::String)::Vector{String}
+function parse(code::AbstractString)::Vector{String}
     code = replace(code,"("=>" ( ")
     code = replace(code,")"=>" ) ")
     code = replace(code, "|" => " | ")
@@ -108,6 +108,8 @@ end
 
 
 function checkMatches(code1::Vector{String},pattern::Vector{String}, get_vars = false)::Union{Bool, Tuple{Bool,Dict{String,String}}}
+    println("checking: ",code1," == ",pattern)
+    
     matches = Dict{String,String}()
 
     #remove outer parenthesis
@@ -124,7 +126,6 @@ function checkMatches(code1::Vector{String},pattern::Vector{String}, get_vars = 
     #Compare each term one by one
     while pattern_index <= length(pattern)
         #Compare code term and pattern term
-
         #if they don't match or have a speccial case return false
         if example_index > length(code1) || #pattern is longer than code
                 (code1[example_index] != pattern[pattern_index] && #code doesn't match pattern
@@ -134,6 +135,8 @@ function checkMatches(code1::Vector{String},pattern::Vector{String}, get_vars = 
 
             return get_vars ? (false,matches) : false
         end
+        println("code1[example_index]: ",code1[example_index])
+        println("pattern[pattern_index]: ",pattern[pattern_index])
 
         #if the string is (, skip to the the closing )
         if code1[example_index] == "(" && pattern[pattern_index][1] == '_'
@@ -293,6 +296,7 @@ function split_list_on_commas(code::Vector{String})::Vector{Vector{String}}
     return separated_lists
 end
 
+
 function assignment_to_match(code::Vector{String})::Dict{String,String}
     match = Dict{String,String}()
     
@@ -308,7 +312,6 @@ end
 
 #Add recursion over subexpressions and over commas
 function replace_definitions(code::Vector{String}, definitions::Dict{String,String})::Vector{String}
-    
     #handle commas
     grouped_code = group_parentheses(code)
     codes = split_list_on_commas(grouped_code)
@@ -331,34 +334,51 @@ function replace_definitions(code::Vector{String}, definitions::Dict{String,Stri
     
     #check subexpressions
 
+    #Add order so definitions may contain terms from other definitions
+
 
     return code
 end
 
 
+function run(file_name::String)
+    # Open the file
+    file = open(file_name, "r")
+
+    # Read the contents of the file
+    contents = read(file, String)
+
+    # Close the file
+    close(file)
+
+    # Print the contents of the file
+    lines = split(contents,"\n")
+    definitions = Dict{String,String}()
+
+    #Remove comments and empty lines
+    lines = [strip(line) for line in lines if strip(line) != "" && strip(line)[1] != '#']
+
+    for line in lines
+        line = replace_definitions(parse(line),definitions)
+        definitions = merge(definitions,assignment_to_match(line))
+        println(line)
+    end
+    println(definitions)
+end
 
 #include("test.jl")
 
-# Open the file
-file = open("script.hm", "r")
 
-# Read the contents of the file
-contents = read(file, String)
+#run("script.hm")
 
-# Close the file
-close(file)
-
-# Print the contents of the file
-lines = split(contents,"\n")
-definitions = Dict{String,String}()
-
-#Remove comments and empty lines
-lines = [strip(line) for line in lines if strip(line) != "" && strip(line)[1] != '#']
+definitions = Dict{String,String}("a" => "sam")
+println("replace: ",replace_definitions(parse("A _x := (a) _x"),definitions))
+#
 
 
 
-definitions = Dict{String,String}("_x is Num" =>"_x has size")
-println(replace_definitions(parse("a b c, (a is Num), q r s"),definitions))
+#definitions = Dict{String,String}("_x is Num" =>"_x has size")
+#println(replace_definitions(parse("a b c, (a is Num), q r s"),definitions))
 
 
 
