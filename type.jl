@@ -275,6 +275,8 @@ function modus_ponens(code::Vector{String}, implication_pattern::Vector{String})
 
     match_result = checkMatches(code,premise,true)
 
+
+
     @assert match_result[1] == true
 
     conclusion = remove_outer_parentheses(parse(grouped_implication[3]))
@@ -371,8 +373,10 @@ function evaluate(code::Vector{String})
 
     grouped_code = group_parentheses(remove_outer_parentheses(code))
     if length(grouped_code) == 2 &&  occursin("->",grouped_code[1])
-        println(modus_ponens(remove_outer_parentheses(ungroup_parentheses([grouped_code[2]])),remove_outer_parentheses(ungroup_parentheses([grouped_code[1]]))))
+        arg =  evaluate(remove_outer_parentheses(ungroup_parentheses([grouped_code[2]])))
+        return(modus_ponens(arg,remove_outer_parentheses(ungroup_parentheses([grouped_code[1]]))))
     end
+    return code
 end
 
 function run(file_name::String)
@@ -396,9 +400,12 @@ function run(file_name::String)
         line = lines[line_index]
         line = replace_definitions(parse(line),definitions)
         definitions = merge(definitions,assignment_to_match(line))
-        evaluate(line)
+
+        println(join(evaluate(line),' '))
         lines[line_index] = join(line,' ')
     end
+
+
 
     #println("\n\n")
     #for line in lines

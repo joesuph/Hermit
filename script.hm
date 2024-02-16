@@ -16,9 +16,11 @@ fact := john is bad
 #bad example
 oth := bad_rule(fact)
 
-bad_rule(fact)
+#imply zero
+zero := 0 : num
 
+succ := (_a : num) -> ((next _a) : num)
+
+succ(succ(zero))
 
 #Gather entailments for a certain context
-
-
