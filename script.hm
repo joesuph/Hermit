@@ -12,15 +12,28 @@ B cat := A 4 + 3
 bad_rule := _a is bad -> don't elect _a
 fact := john is bad
 
-
-#bad example
 oth := bad_rule(fact)
 
-#imply zero
+#peano arithmetic
 zero := 0 : num
 
 succ := (_a : num) -> ((next _a) : num)
 
-succ(succ(zero))
+text_of_num := (_a) -> ( print(_a) ) 
+
+succ(zero)
+
+py(text_of_num(4))
+
+
+
+
+#how to mix symbols and functions? Can rewrite rules state facts about functions?
+
+
+
+
+
+
 
 #Gather entailments for a certain context

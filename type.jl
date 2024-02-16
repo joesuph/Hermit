@@ -1,4 +1,5 @@
 #main file
+using PyCall 
 
 #Convert code to symbol list including parentheses and bars
 function parse(code::AbstractString)::Vector{String}
@@ -370,8 +371,16 @@ function replace_definitions(code::Vector{String}, definitions::Dict{String,Stri
 end
 
 function evaluate(code::Vector{String})
-
+    
     grouped_code = group_parentheses(remove_outer_parentheses(code))
+    if length(grouped_code) == 2 && grouped_code[1] == "py"
+        println("arg1: ",remove_outer_parentheses(ungroup_parentheses([grouped_code[2]])))
+        arg = join(evaluate(remove_outer_parentheses(ungroup_parentheses([grouped_code[2]]))),' ')
+        #arg = join(remove_outer_parentheses(ungroup_parentheses([grouped_code[2]])),' ')[2:end-1]
+        println("arg: ",arg)
+        return pyeval(arg)
+    end
+
     if length(grouped_code) == 2 &&  occursin("->",grouped_code[1])
         arg =  evaluate(remove_outer_parentheses(ungroup_parentheses([grouped_code[2]])))
         return(modus_ponens(arg,remove_outer_parentheses(ungroup_parentheses([grouped_code[1]]))))
@@ -401,7 +410,7 @@ function run(file_name::String)
         line = replace_definitions(parse(line),definitions)
         definitions = merge(definitions,assignment_to_match(line))
 
-        println(join(evaluate(line),' '))
+        println(evaluate(line))
         lines[line_index] = join(line,' ')
     end
 
